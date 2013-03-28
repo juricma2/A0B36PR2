@@ -10,7 +10,15 @@ package semestralkapr2;
  */
 public class Message {
     private String tweet;
+    
+    public String code(String password){
+        return null;
+    }
 
+    public String decode(String password){
+        return null;
+    }
+    
     public Message(String tweet) {
         this.tweet = tweet;
     }
