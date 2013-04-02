@@ -10,6 +10,7 @@ package semestralkapr2;
  */
 public class Message {
     private String tweet;
+    private final String abeceda = "abcdefghijklmnopqrstuvwxyz 1234567890.,-/:!?+()";
     
     public String code(String password){
         return null;

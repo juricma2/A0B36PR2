@@ -13,7 +13,9 @@ public class GUI extends javax.swing.JFrame {
     /**
      * Creates new form GUI
      */
-    public GUI() {
+    private Network net;
+    public GUI(Network net) {
+        this.net=net;
         initComponents();
     }
 
@@ -123,7 +125,7 @@ public class GUI extends javax.swing.JFrame {
         /* Create and display the form */
         java.awt.EventQueue.invokeLater(new Runnable() {
             public void run() {
-                new GUI().setVisible(true);
+                
             }
         });
     }

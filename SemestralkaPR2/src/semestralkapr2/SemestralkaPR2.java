@@ -14,7 +14,7 @@ public class SemestralkaPR2 {
      * @param args the command line arguments
      */
     public static void main(String[] args) {
-        GUI g = new GUI();
-        g.setVisible(true);
+        MainMenu m = new MainMenu();
+        m.setVisible(true);
 }
 }
