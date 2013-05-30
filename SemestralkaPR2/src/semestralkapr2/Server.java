@@ -14,6 +14,7 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.OutputStream;
 import java.io.PrintWriter;
+import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.logging.Level;
@@ -24,16 +25,19 @@ import javax.swing.JOptionPane;
  *
  * @author Administrator
  */
-public class Server extends javax.swing.JFrame {
+public class Server extends javax.swing.JFrame implements Runnable{
+    //deklarace promennych
     private Socket socket;
     private String klic="a";
     private static ObjectOutputStream out;
     private static ObjectInputStream in;
     private ServerSocket server;
+    private int PORT;
     
     //konstuktor
-    public Server() throws IOException {
-        initComponents();  
+    public Server(int PORT) throws IOException {
+        this.PORT=PORT;
+        initComponents();
     }
     //metody na kodovani a dekodovani
     private String koduj(String x, String klic){
@@ -49,12 +53,12 @@ public class Server extends javax.swing.JFrame {
             pismenoKlice = klic.charAt(pomocna);
             char pismeno = x.charAt(i);
             int diference = 0;
-            for (int j = 0; j < 60; j++) {
+            for (int j = 0; j < 60; j++) {//zjisteni rozdilu mezi kodovanym a skutecnym pismenem
                 if (pismenoKlice==abeceda.charAt(j)) {
                     diference = j;
                 } 
             }
-            for (int j = 0; j < 60; j++) {
+            for (int j = 0; j < 60; j++) {//nahrazeni skutecneho pismene kodovanym
                 if (pismeno == abeceda.charAt(j)) {
                     if ((j+diference)>59) {
                         text=text+(abeceda.charAt((j+diference)-60));
@@ -71,6 +75,10 @@ public class Server extends javax.swing.JFrame {
     private String dekoduj(String x, String klic){
         String abeceda = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz .,!-?/_";
         String text = "";
+        if (x.equals("BYEBYE")) {//kdyz tohle prijde od klienta, znamena to, ze skoncil
+            alert("Client terminated connection.");
+            System.exit(0);//konec programu
+        }
         int pomocna = 0;
         char pismenoKlice;
         for (int i = 0; i < x.length(); i++) {
@@ -81,12 +89,12 @@ public class Server extends javax.swing.JFrame {
             pismenoKlice = klic.charAt(pomocna);
             char pismeno = x.charAt(i);
             int diference = 0;
-            for (int j = 0; j < 60; j++) {
+            for (int j = 0; j < 60; j++) {//zjisteni rozdilu mezi skutecnym a kodovanym pismenem
                 if (pismenoKlice==abeceda.charAt(j)) {
                     diference = j;
                 } 
             }
-            for (int j = 0; j < 60; j++) {
+            for (int j = 0; j < 60; j++) {//nahrazeni kodovaneho pismene skutecnym
                 if (pismeno == abeceda.charAt(j)) {
                     if ((j-diference)<0) {
                         text=text+(abeceda.charAt((j-diference)+60));
@@ -106,7 +114,7 @@ public class Server extends javax.swing.JFrame {
         String abeceda = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz .,!-?/";
         String pomocna = "";
         String y="";
-        if (x.charAt(0)=='\n') {
+        if (x.charAt(0)=='\n') {//pokud je na zacatku enter text se posune
             for (int i = 1; i < x.length(); i++) {
                 y=y+x.charAt(i);
             }
@@ -114,7 +122,7 @@ public class Server extends javax.swing.JFrame {
             y=x;
         }
         boolean ok = false;
-        for (int i = 0; i < y.length(); i++) {
+        for (int i = 0; i < y.length(); i++) {//vymazani neznamych znaku
             for (int j = 0; j < 59; j++) {
                 if (y.charAt(i)==abeceda.charAt(j)) {
                     pomocna = pomocna+y.charAt(i);
@@ -122,7 +130,7 @@ public class Server extends javax.swing.JFrame {
                 }
                 
             }
-            if (ok==false) {
+            if (ok==false) {//nahrazeni neznameho znaku podtrzitkem
                 pomocna=pomocna+"_";
             }
             ok=false;
@@ -131,64 +139,77 @@ public class Server extends javax.swing.JFrame {
     }
     //formatovni a priprava k odeslani
     private void odeslat() throws IOException{
-        String pomocna = prevod(jTextArea2.getText());
-        String kod = koduj(pomocna,klic);
-        jTextArea1.setText(jTextArea1.getText()+"\n"+"You said: "+pomocna);
-        jTextArea2.setText("");
-        poslat(kod);
+        String pomocna = prevod(jTextArea2.getText());//prevod nespravneho textu na pouzitelny
+        String kod = koduj(pomocna,klic);//kodovani
+        jTextArea1.setText(jTextArea1.getText()+"\n"+"You said: "+pomocna);//co ja rekl
+        jTextArea2.setText("");//vymazani textu
+        poslat(kod);//odeslani metodou poslat
     }
     //format upozorneni
     private void alert(String message) {
-        JOptionPane.showMessageDialog(null, message);
+        JOptionPane.showMessageDialog(null, message);//vyhodi okno se zpravou
     }
     private void inform(String message){
-        jTextArea1.setText(jTextArea1.getText()+"\n"+message);
+        jTextArea1.setText(jTextArea1.getText()+"\n"+message);//vypise text
     }
     //metody pro spravny beh sitovani
     public void spustit() {
         try {
             setTitle("Server");
-            server = new ServerSocket(2187, 4);
-            while (true) {
+            inform("Your IP: "+InetAddress.getLocalHost().toString());//jaka je moje IP
+            try {//pokus o vytvoreni pripojeni na danem portu
+                server = new ServerSocket(PORT, 4);
+
+            } catch (Exception e) {//kdyz je zadan spatny port, nebo jina chyba
+                alert("Error");
+                System.exit(0);
+            }
+            
+            
+            while (true) {//nekonecna smycka
                 
                 try {
                     
-                    cekani();
-                    nastav();
-                    prubeh();
+                    cekani();//cekani na pripojeni klienta
+                    nastav();//nastaveni vstupu a vystupu
+                    prubeh();//prijem zprav
                 } catch (EOFException eofException) {
-                    alert("Client ended the connection!");
+                    alert("Client ended the connection!");//kdyz klient skonci
                 } finally {
-                    konec();
+                    konec();//konec aplikace
                 }
             }
         } catch (IOException ioException) {
             ioException.printStackTrace();
         }
     }
+    //nastaveni vstupu a vystupu
     private void nastav() throws IOException {
         out = new ObjectOutputStream(socket.getOutputStream());
-        out.flush();
-        in = new ObjectInputStream(socket.getInputStream());
+        out.flush();//nastaveni vystupu a jeho "splachnuti"
+        in = new ObjectInputStream(socket.getInputStream());//nastaveni vstupu
         inform("Streams are now setup!");
  
  
     }
+    //cekani na klienta
     private void cekani() throws IOException {
-        socket = server.accept();
+        socket = server.accept();//prijem klienta
         inform("Now connected to " + socket.getInetAddress().getHostName());
     }
+    //konec aplikace
     private void konec() {
         inform("Closing Connection...");
         try {
-            out.close();
-            in.close();
-            socket.close();
+            out.close();//zavreni vystupu
+            in.close();//zavreni vstupu
+            socket.close();//ukonceni pripojeni
         } catch (IOException ioException) {
             System.exit(0);
         }
  
     }
+    //prijem zprav
     private void prubeh() throws IOException {
         String message = "You are now connected!";
         inform(message);
@@ -196,19 +217,19 @@ public class Server extends javax.swing.JFrame {
         do {
             
             try {
-                zprava = (String)in.readObject();
-                String pomocna = dekoduj(zprava,klic);
+                zprava = (String)in.readObject();//prijem zprav
+                String pomocna = dekoduj(zprava,klic);//dekodovani
                 inform("Client said: "+pomocna);
-                jTextArea1.setCaretPosition(jTextArea1.getText().length());
+                jTextArea1.setCaretPosition(jTextArea1.getText().length());//posunuti kurzoru na konec
             } catch (Exception e) {
             }
             
-        } while (!message.equals("CLIENT - END"));
+        } while (!message.equals("CLIENT - END"));//nekonecna smycka
     }
-    //odeslani textu
+    //samotne odeslani textu
     public static void poslat(String text) throws IOException {
-        out.writeObject(text);
-        out.flush();
+        out.writeObject(text);//odesli text
+        out.flush();//splachnuti vystupu
         
     }
     
@@ -319,7 +340,8 @@ public class Server extends javax.swing.JFrame {
 
         pack();
     }// </editor-fold>//GEN-END:initComponents
-
+    
+    //tlacitko odeslani
     private void jButton2ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton2ActionPerformed
         try {
             odeslat();
@@ -328,18 +350,19 @@ public class Server extends javax.swing.JFrame {
         }
     }//GEN-LAST:event_jButton2ActionPerformed
 
+    //enter - to same, co tlacitko odeslani
     private void jTextArea2KeyPressed(java.awt.event.KeyEvent evt) {//GEN-FIRST:event_jTextArea2KeyPressed
         if(evt.getKeyCode() == KeyEvent.VK_ENTER){
             String pomocna="";
             for (int i = 0; i < (jTextArea2.getText().length()); i++) {
-                pomocna=pomocna+jTextArea2.getText().charAt(i);
+                pomocna=pomocna+jTextArea2.getText().charAt(i);//ulozeni textu do promenne
             }
-            jTextArea2.setText(null);
-            jTextArea2.setCaretPosition(0);
-            jTextArea1.setText(jTextArea1.getText()+"\n"+"You said: "+prevod(pomocna));
+            jTextArea2.setText(null);//vymazani textu
+            jTextArea2.setCaretPosition(0);//posunuti kurzoru na zacatek
+            jTextArea1.setText(jTextArea1.getText()+"\n"+"You said: "+prevod(pomocna));//co ja rekl
             
                 try {
-                    poslat(koduj(prevod(pomocna),klic));
+                    poslat(koduj(prevod(pomocna),klic));//odeslani zakodovyneho textu metodou poslat
                     jTextArea2.setText(null);
                     jTextArea2.setCaretPosition(0);
                 } catch (IOException ex) {
@@ -356,26 +379,24 @@ public class Server extends javax.swing.JFrame {
 
     private void jTextArea2CaretPositionChanged(java.awt.event.InputMethodEvent evt) {//GEN-FIRST:event_jTextArea2CaretPositionChanged
     }//GEN-LAST:event_jTextArea2CaretPositionChanged
-
+    //tlacitko leave
     private void jButton3ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton3ActionPerformed
-        konec();
-        System.exit(0);
+        konec();//zavreni pripojeni
+        System.exit(0);//konec programu
     }//GEN-LAST:event_jButton3ActionPerformed
-
+    //tlacitko nastaveni klice
     private void jButton1ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton1ActionPerformed
         klic="";
         int pomocna = jPasswordField1.getPassword().length;
         for (int i = 0; i < pomocna; i++) {
-            klic=klic+jPasswordField1.getPassword()[i];
+            klic=klic+jPasswordField1.getPassword()[i];//ulozeni klice do promenne
         }
-        klic=prevod(klic);// TODO add your handling code here:
+        klic=prevod(klic);//prevod nevhodneho klice na pouzitelny
     }//GEN-LAST:event_jButton1ActionPerformed
 
     
-    /**
-     * @param args the command line arguments
-     */
-    public static void main(String args[]) throws IOException {
+    //hlavni metoda
+    public static void main(String args[], int PORT) throws IOException {
         /* Set the Nimbus look and feel */
         //<editor-fold defaultstate="collapsed" desc=" Look and feel setting code (optional) ">
         /* If Nimbus (introduced in Java SE 6) is not available, stay with the default look and feel.
@@ -401,7 +422,7 @@ public class Server extends javax.swing.JFrame {
 
         /* Create and display the form */
         Server server;
-        server = new Server();
+        server = new Server(PORT);//spusteni serveru se zadanym portem
         server.setVisible(true);
         server.spustit();
         
@@ -416,4 +437,13 @@ public class Server extends javax.swing.JFrame {
     private javax.swing.JTextArea jTextArea1;
     private javax.swing.JTextArea jTextArea2;
     // End of variables declaration//GEN-END:variables
+
+    @Override
+    public void run() {//provede se pri spusteni vlakna se serverem 
+        try {
+            main(null,PORT);//hlavni metoda
+        } catch (IOException ex) {
+            Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }    
 }

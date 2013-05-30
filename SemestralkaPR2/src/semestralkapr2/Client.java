@@ -26,19 +26,23 @@ import javax.swing.JOptionPane;
  *
  * @author Administrator
  */
-public class Client extends javax.swing.JFrame {
+public class Client extends javax.swing.JFrame implements Runnable{
+    //deklarace promennych
     private Socket socket;
     private String klic ="a";
     private static ObjectOutputStream out;
     private ObjectInputStream in;
     private String IP;
-
+    private int PORT;
     //konstruktor
-    public Client() throws IOException {
+    public Client(String IP,int PORT) throws IOException {
+        this.IP=IP;
+        this.PORT=PORT;
         initComponents(); 
     }
     //metody na kodovani a dekodovani
     private String koduj(String x, String klic){
+        //promenne
         String abeceda = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz .,!-?/_";
         String text = "";
         int pomocna = 0;
@@ -53,10 +57,11 @@ public class Client extends javax.swing.JFrame {
             int diference = 0;
             for (int j = 0; j < 60; j++) {
                 if (pismenoKlice==abeceda.charAt(j)) {
-                    diference = j;
+                    diference = j;//zjisteni rozdilu mezi skutecnym a kodovanym pismenem
                 } 
             }
             for (int j = 0; j < 60; j++) {
+                //nahrazeni skutecneho pismene kodovanim
                 if (pismeno == abeceda.charAt(j)) {
                     if ((j+diference)>59) {
                         text=text+(abeceda.charAt((j+diference)-60));
@@ -84,11 +89,11 @@ public class Client extends javax.swing.JFrame {
             char pismeno = x.charAt(i);
             int diference = 0;
             for (int j = 0; j < 60; j++) {
-                if (pismenoKlice==abeceda.charAt(j)) {
+                if (pismenoKlice==abeceda.charAt(j)) {//zjisteni rozdilu mezi skutecnym a kodovanym pismenem
                     diference = j;
                 } 
             }
-            for (int j = 0; j < 60; j++) {
+            for (int j = 0; j < 60; j++) {//nahrazeni kodovaneho pismene skutecnym
                 if (pismeno == abeceda.charAt(j)) {
                     if ((j-diference)<0) {
                         text=text+(abeceda.charAt((j-diference)+60));
@@ -104,30 +109,34 @@ public class Client extends javax.swing.JFrame {
     }
     //format upozorneni
     private void inform(String message){
-        jTextArea1.setText(jTextArea1.getText()+"\n"+message);
+        jTextArea1.setText(jTextArea1.getText()+"\n"+message);//vypise text do horniho textarea
     }
     private void alert(String message) {
-        JOptionPane.showMessageDialog(null, message);
+        JOptionPane.showMessageDialog(null, message);//vyhodi okno se zpravou
     }
-    //metody pro spravny prubeh sitovani
+    //metody pro nastaveni
     private void nastav() throws IOException {
-        out = new ObjectOutputStream(socket.getOutputStream());
+        out = new ObjectOutputStream(socket.getOutputStream());//nastaveni vystupu
         out.flush();
-        in = new ObjectInputStream(socket.getInputStream());
+        in = new ObjectInputStream(socket.getInputStream());//nastaveni vstupu
         inform("Streams are now setup!");
  
  
     }
     private void pripojit() throws IOException {
         inform("Attempting connection...");
-        IP = "127.0.0.1";
-        socket = new Socket(InetAddress.getByName(IP), 2187);
+        try {//pokuosi se vytvorit pripojeni s IP adresou a portem
+            socket = new Socket(InetAddress.getByName(IP), PORT);
+        }catch(Exception e){//pri spatnem portu, IP, nebo jine chybe
+            alert("Connection failed");
+            System.exit(0);
+        }
         inform("Connected to server" + socket.getInetAddress().getHostName());
     }
     private void konec() {
         inform("Closing Connection...");
  
-        try {
+        try {//zavreni pripojeni
             out.close();
             in.close();
             socket.close();
@@ -143,24 +152,24 @@ public class Client extends javax.swing.JFrame {
  
         do {
             try {   
-                zprava = (String) in.readObject();
+                zprava = (String) in.readObject();//precteni zpravy ze vstupu
                 String pomocna = dekoduj(zprava,klic);
                 inform("Server said: "+pomocna);
-                jTextArea1.setCaretPosition(jTextArea1.getText().length());
+                jTextArea1.setCaretPosition(jTextArea1.getText().length());//presunuti kurzoru na konec
                 
-            } catch (ClassNotFoundException classNotFoundException) {
+            } catch (Exception e) {
             }
             
-        } while (!message.equals("CLIENT - END"));
+        } while (!message.equals("CLIENT - END"));//nekonecna smycka
     }
     public void spustit() {
         try {
             setTitle("Client");
-            pripojit();
-            nastav();
-            prubeh();
+            pripojit();//pripojeni
+            nastav();//nastaveni vstupu a vystupu
+            prubeh();//prije a odesilani zprav
         } catch (EOFException eofException) {
-            alert("Server terminated connection");
+            alert("Server terminated connection");//kdyz server skonci
         } catch (IOException ioException) {
             ioException.printStackTrace();
         } finally {
@@ -171,8 +180,7 @@ public class Client extends javax.swing.JFrame {
     public static void poslat(String text) throws IOException {
         
         out.writeObject(text);
-        out.flush();
-      
+        out.flush();//samotne odeslani textu a "splachnuti" vystupu      
  
     }
     //prevod do puzitelneho formatu textu
@@ -181,7 +189,7 @@ public class Client extends javax.swing.JFrame {
         String abeceda = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz .,!-?/";
         String pomocna = "";
         String y="";
-        if (x.charAt(0)=='\n') {
+        if (x.charAt(0)=='\n') {//kdyz je na zacatku enter, tak se text posune
             for (int i = 1; i < x.length(); i++) {
                 y=y+x.charAt(i);
             }
@@ -189,7 +197,7 @@ public class Client extends javax.swing.JFrame {
             y=x;
         }
         boolean ok = false;
-        for (int i = 0; i < y.length(); i++) {
+        for (int i = 0; i < y.length(); i++) {//vymazani nespravnych znaku
             for (int j = 0; j < 59; j++) {
                 if (y.charAt(i)==abeceda.charAt(j)) {
                     pomocna = pomocna+y.charAt(i);
@@ -198,7 +206,7 @@ public class Client extends javax.swing.JFrame {
                 
             }
             if (ok==false) {
-                pomocna=pomocna+"_";
+                pomocna=pomocna+"_";//pokud znak neznam, nahradim ho podtrzitkem
             }
             ok=false;
         }
@@ -206,11 +214,11 @@ public class Client extends javax.swing.JFrame {
     }
     //formatovani a priprava k odeslani
     private void odeslat() throws IOException{
-        String pomocna = prevod(jTextArea2.getText());
-        jTextArea1.setText(jTextArea1.getText()+"\n"+"You said: "+pomocna);
+        String pomocna = prevod(jTextArea2.getText());//prevedeni nespravneho vstupu na spravny
+        jTextArea1.setText(jTextArea1.getText()+"\n"+"You said: "+pomocna);//co jsem ja rekl
         
         jTextArea2.setText("");
-        poslat(koduj(pomocna,klic));
+        poslat(koduj(pomocna,klic));//zakodovani textu a odeslani pomoci metody poslat
     }
     
     
@@ -320,7 +328,7 @@ public class Client extends javax.swing.JFrame {
         pack();
     }// </editor-fold>//GEN-END:initComponents
 
-    
+    //tlacitko odeslat
     private void jButton2ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton2ActionPerformed
         try {
             odeslat();
@@ -328,7 +336,7 @@ public class Client extends javax.swing.JFrame {
             Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
         }
     }//GEN-LAST:event_jButton2ActionPerformed
-
+    //enter - dela to same, co tlacitko odeslat
     private void jTextArea2KeyPressed(java.awt.event.KeyEvent evt) {//GEN-FIRST:event_jTextArea2KeyPressed
         if(evt.getKeyCode() == KeyEvent.VK_ENTER){
             String pomocna="";
@@ -336,11 +344,11 @@ public class Client extends javax.swing.JFrame {
                 pomocna=pomocna+jTextArea2.getText().charAt(i);
             }
             
-            jTextArea2.setText(null);
-            jTextArea2.setCaretPosition(0);
-            jTextArea1.setText(jTextArea1.getText()+"\n"+"You said: "+prevod(pomocna));
+            jTextArea2.setText(null);//vymazani napsaneho
+            jTextArea2.setCaretPosition(0);//presun kurzoru
+            jTextArea1.setText(jTextArea1.getText()+"\n"+"You said: "+prevod(pomocna));//co ja rekl
                 try {
-                    poslat(koduj(prevod(pomocna),klic));
+                    poslat(koduj(prevod(pomocna),klic));//odeslani
                 } catch (IOException ex) {
                     Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
                 }
@@ -351,26 +359,30 @@ public class Client extends javax.swing.JFrame {
     private void jTextArea2InputMethodTextChanged(java.awt.event.InputMethodEvent evt) {//GEN-FIRST:event_jTextArea2InputMethodTextChanged
         
     }//GEN-LAST:event_jTextArea2InputMethodTextChanged
-
+    //tlacitko ukonceni - leave
     private void jButton3ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton3ActionPerformed
-        
+        try {
+            poslat("BYEBYE");//text, ktery zavre server
+        } catch (IOException ex) {
+            Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
+        }
         konec();
-        System.exit(0);        // TODO add your handling code here:
+        System.exit(0);        // vypnout program
     }//GEN-LAST:event_jButton3ActionPerformed
-
+    //nastaveni hesla
     private void jButton1ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton1ActionPerformed
         klic="";
         int pomocna = jPasswordField1.getPassword().length;
         for (int i = 0; i < pomocna; i++) {
-            klic=klic+jPasswordField1.getPassword()[i];
+            klic=klic+jPasswordField1.getPassword()[i];//ulozeni klice do promenne
         }
-        klic=prevod(klic);
+        klic=prevod(klic);//prevod nevhodneho hesla na pouzitelne
     }//GEN-LAST:event_jButton1ActionPerformed
 
     /**
      * @param args the command line arguments
      */
-    public static void main(String args[]) throws IOException {
+    public static void main(String args[],String IP,int PORT) throws IOException {//hlavni metoda
         /* Set the Nimbus look and feel */
         //<editor-fold defaultstate="collapsed" desc=" Look and feel setting code (optional) ">
         /* If Nimbus (introduced in Java SE 6) is not available, stay with the default look and feel.
@@ -396,7 +408,7 @@ public class Client extends javax.swing.JFrame {
 
         /* Create and display the form */
         Client client;
-        client = new Client();
+        client = new Client(IP,PORT);//vytvoreni klienta, je zadana IP a port
         client.setVisible(true);
         client.spustit();
     }
@@ -410,4 +422,13 @@ public class Client extends javax.swing.JFrame {
     private javax.swing.JTextArea jTextArea1;
     private javax.swing.JTextArea jTextArea2;
     // End of variables declaration//GEN-END:variables
+
+    @Override
+    public void run() {//provede se pri spusteni vlakna
+        try {
+            main(null, IP, PORT);//provede hlavni metodu, 
+        } catch (IOException ex) {
+            Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }
 }
